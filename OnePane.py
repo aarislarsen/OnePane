@@ -736,7 +736,7 @@ def create_web_interface(groups, folder_path, port=5000):
                 try:
                     # Load and resize image
                     img = Image.open(img_info['path'])
-                    img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                    img.thumbnail((1000, 1000), Image.Resampling.LANCZOS)
                     
                     # Encode as PNG base64
                     buffered = BytesIO()
@@ -1066,7 +1066,8 @@ def create_web_interface(groups, folder_path, port=5000):
                 display: block;
                 cursor: pointer;
                 transition: border-color 0.2s;
-                max-height: 150px;
+                max-height: 500px;
+                max-width: 500px;
             }
             
             .image-wrapper img:hover {
@@ -1240,17 +1241,15 @@ def create_web_interface(groups, folder_path, port=5000):
             let scrollIntervals = {};         // Tracks active scroll intervals per group
             let scrollSpeed = 11;             // Pixels per interval (adjusted by speed slider)
             let verticalScrollDuration = 800; // Duration for viewport scroll animations
-            let masterPlayActive = false;     // Whether master auto-scroll is running
-            let masterPlayPaused = false;     // Whether master auto-scroll is paused
-            let trackedRows = [];             // Queue of group indices being auto-scrolled
             
             // ===== Image size control =====
             document.getElementById('sizeSlider').addEventListener('input', function() {
                 const size = this.value;
                 document.getElementById('sizeValue').textContent = size + 'px';
-                // Apply new size to all images
+                // Apply new size to all images (set both height and width)
                 document.querySelectorAll('.group-image').forEach(img => {
                     img.style.maxHeight = size + 'px';
+                    img.style.maxWidth = size + 'px';
                 });
             });
             
@@ -1263,26 +1262,6 @@ def create_web_interface(groups, folder_path, port=5000):
                 // Adjust vertical scroll duration inversely (faster scroll = shorter duration)
                 verticalScrollDuration = 1400 - ((speed - 1) / 9) * 1200;
             });
-            
-            // ===== Viewport visibility detection =====
-            function isElementInViewport(el) {
-                const rect = el.getBoundingClientRect();
-                return (
-                    rect.top >= 0 &&
-                    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight)
-                );
-            }
-            
-            function getVisibleGroups() {
-                const groups = document.querySelectorAll('.group');
-                const visible = [];
-                groups.forEach((group, index) => {
-                    if (isElementInViewport(group)) {
-                        visible.push(index);
-                    }
-                });
-                return visible;
-            }
             
             // ===== Scroll capability detection =====
             function canScroll(groupIndex) {
@@ -1308,33 +1287,26 @@ def create_web_interface(groups, folder_path, port=5000):
                     } else {
                         // Start scrolling
                         if (!canScroll(groupIndex)) {
-                            // No scrollable content - simulate completion
-                            playBtn.textContent = '⏸';
-                            playBtn.title = 'Waiting...';
-                            setTimeout(() => {
+                            // No scrollable content - do nothing
+                            return;
+                        }
+                        
+                        // Start scroll interval
+                        scrollIntervals[groupIndex] = setInterval(() => {
+                            container.scrollLeft += scrollSpeed;
+                            
+                            // Check if reached end
+                            if (container.scrollLeft >= container.scrollWidth - container.clientWidth) {
+                                clearInterval(scrollIntervals[groupIndex]);
+                                scrollIntervals[groupIndex] = null;
                                 playBtn.textContent = '▶';
                                 playBtn.title = 'Auto-scroll';
-                                onRowComplete(groupIndex);
-                            }, 1000);
-                        } else {
-                            // Start scroll interval
-                            scrollIntervals[groupIndex] = setInterval(() => {
-                                container.scrollLeft += scrollSpeed;
-                                
-                                // Check if reached end
-                                if (container.scrollLeft >= container.scrollWidth - container.clientWidth) {
-                                    clearInterval(scrollIntervals[groupIndex]);
-                                    scrollIntervals[groupIndex] = null;
-                                    playBtn.textContent = '▶';
-                                    playBtn.title = 'Auto-scroll';
-                                    rewindBtn.disabled = false;
-                                    onRowComplete(groupIndex);
-                                }
-                            }, 20);  // Update every 20ms
-                            playBtn.textContent = '⏸';
-                            playBtn.title = 'Pause';
-                            rewindBtn.disabled = true;
-                        }
+                                rewindBtn.disabled = false;
+                            }
+                        }, 20);  // Update every 20ms
+                        playBtn.textContent = '⏸';
+                        playBtn.title = 'Pause';
+                        rewindBtn.disabled = true;
                     }
                 } else if (action === 'rewind') {
                     // Reset scroll position
@@ -1343,171 +1315,16 @@ def create_web_interface(groups, folder_path, port=5000):
                 }
             }
             
-            // ===== Row completion handler =====
-            function onRowComplete(groupIndex) {
-                // Trigger next action only if this row is being tracked by master play
-                if (masterPlayActive && !masterPlayPaused && trackedRows.length > 0 && trackedRows[0] === groupIndex) {
-                    // Remove this row from tracking queue
-                    trackedRows.shift();
-                    // Move viewport down and start next row
-                    moveToNextRow();
-                }
-            }
-            
-            // ===== Master play: move to next row =====
-            function moveToNextRow() {
-                if (!masterPlayActive || masterPlayPaused) return;
-                
-                const totalGroups = document.querySelectorAll('.group').length;
-                const visibleGroups = getVisibleGroups();
-                
-                if (visibleGroups.length === 0) {
-                    pauseMasterPlay();
-                    return;
-                }
-                
-                // Find next row after all currently visible rows
-                const maxVisible = Math.max(...visibleGroups);
-                const nextRowIndex = maxVisible + 1;
-                
-                if (nextRowIndex >= totalGroups) {
-                    // No more rows
-                    if (trackedRows.length === 0) {
-                        pauseMasterPlay();
-                    }
-                    return;
-                }
-                
-                // Scroll viewport to show next row
-                const groupElement = document.querySelector(`[data-group-index="${nextRowIndex}"]`);
-                groupElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                
-                // Wait for scroll animation, then start new row
-                setTimeout(() => {
-                    if (masterPlayActive && !masterPlayPaused) {
-                        const container = document.getElementById('group-' + nextRowIndex);
-                        container.scrollLeft = 0;
-                        
-                        setTimeout(() => {
-                            if (masterPlayActive && !masterPlayPaused) {
-                                trackedRows.push(nextRowIndex);
-                                scrollGroup(nextRowIndex, 'play');
-                            }
-                        }, 100);
-                    }
-                }, verticalScrollDuration);
-            }
-            
-            // ===== Master play toggle =====
+            // ===== Master play toggle (currently disabled - placeholder for future functionality) =====
             function toggleMasterPlay() {
-                if (masterPlayActive && !masterPlayPaused) {
-                    pauseMasterPlay();
-                } else if (masterPlayActive && masterPlayPaused) {
-                    resumeMasterPlay();
-                } else {
-                    startMasterPlay();
-                }
+                // Placeholder for master play functionality
+                console.log('Master play functionality disabled');
             }
             
-            // ===== Master play: start =====
-            function startMasterPlay() {
-                masterPlayActive = true;
-                masterPlayPaused = false;
-                trackedRows = [];
-                const masterBtn = document.getElementById('masterPlayBtn');
-                masterBtn.textContent = '⏸';
-                masterBtn.classList.remove('paused');
-                masterBtn.title = 'Pause auto-scroll';
-                
-                // Scroll to top of page
-                window.scrollTo({ 
-                    top: 0,
-                    behavior: 'smooth' 
-                });
-                
-                // Wait for scroll to complete
-                setTimeout(() => {
-                    if (!masterPlayActive) return;
-                    
-                    // Get visible groups after scroll
-                    const visibleGroups = getVisibleGroups();
-                    if (visibleGroups.length === 0) return;
-                    
-                    // Start scrolling all visible groups with staggered timing
-                    visibleGroups.forEach((groupIndex, arrayIndex) => {
-                        const container = document.getElementById('group-' + groupIndex);
-                        container.scrollLeft = 0;
-                        
-                        // Add to tracking queue
-                        trackedRows.push(groupIndex);
-                        
-                        // Start with 500ms stagger between groups
-                        setTimeout(() => {
-                            if (masterPlayActive && !masterPlayPaused) {
-                                scrollGroup(groupIndex, 'play');
-                            }
-                        }, 100 + (arrayIndex * 500));
-                    });
-                }, 1000);
-            }
-            
-            // ===== Master play: pause =====
-            function pauseMasterPlay() {
-                masterPlayPaused = true;
-                const masterBtn = document.getElementById('masterPlayBtn');
-                masterBtn.textContent = '▶';
-                masterBtn.classList.add('paused');
-                masterBtn.title = 'Resume auto-scroll';
-                
-                // Pause all active scrolling
-                Object.keys(scrollIntervals).forEach(groupIndex => {
-                    if (scrollIntervals[groupIndex]) {
-                        clearInterval(scrollIntervals[groupIndex]);
-                        scrollIntervals[groupIndex] = null;
-                        const playBtn = document.querySelectorAll('.play-btn')[groupIndex];
-                        playBtn.textContent = '▶';
-                        playBtn.title = 'Auto-scroll';
-                    }
-                });
-            }
-            
-            // ===== Master play: resume =====
-            function resumeMasterPlay() {
-                masterPlayPaused = false;
-                const masterBtn = document.getElementById('masterPlayBtn');
-                masterBtn.textContent = '⏸';
-                masterBtn.classList.remove('paused');
-                masterBtn.title = 'Pause auto-scroll';
-                
-                // Resume scrolling visible groups
-                const visibleGroups = getVisibleGroups();
-                visibleGroups.forEach(groupIndex => {
-                    if (masterPlayActive && !masterPlayPaused) {
-                        scrollGroup(groupIndex, 'play');
-                    }
-                });
-            }
-            
-            // ===== Master play: reset =====
+            // ===== Master play: reset (currently disabled - placeholder for future functionality) =====
             function resetMasterPlay() {
-                masterPlayActive = false;
-                masterPlayPaused = false;
-                trackedRows = [];
-                const masterBtn = document.getElementById('masterPlayBtn');
-                masterBtn.textContent = '▶';
-                masterBtn.classList.remove('paused');
-                masterBtn.title = 'Auto-scroll all groups';
-                
-                // Stop all active scrolling
-                Object.keys(scrollIntervals).forEach(groupIndex => {
-                    if (scrollIntervals[groupIndex]) {
-                        clearInterval(scrollIntervals[groupIndex]);
-                        scrollIntervals[groupIndex] = null;
-                        const playBtn = document.querySelectorAll('.play-btn')[groupIndex];
-                        playBtn.textContent = '▶';
-                        playBtn.title = 'Auto-scroll';
-                    }
-                });
+                // Placeholder for reset functionality
+                console.log('Reset functionality disabled');
             }
             
             // ===== Enable rewind button when scrolled =====
