@@ -957,6 +957,12 @@ def create_web_interface(groups, folder_path, port=5000):
                 padding: 12px;
                 border-radius: 6px;
                 border: 1px solid #30363d;
+                transition: border-color 0.3s ease;
+            }
+            
+            .group.master-active {
+                border: 3px solid #58a6ff;
+                box-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
             }
             
             .group-header {
@@ -1066,8 +1072,8 @@ def create_web_interface(groups, folder_path, port=5000):
                 display: block;
                 cursor: pointer;
                 transition: border-color 0.2s;
-                max-height: 500px;
-                max-width: 500px;
+                max-height: 800px;
+                max-width: 800px;
             }
             
             .image-wrapper img:hover {
@@ -1168,7 +1174,7 @@ def create_web_interface(groups, folder_path, port=5000):
             <div class="controls-grid">
                 <div class="control-group">
                     <label>Image Size:</label>
-                    <input type="range" id="sizeSlider" min="100" max="500" value="150" step="10">
+                    <input type="range" id="sizeSlider" min="100" max="800" value="150" step="10">
                     <span class="control-value" id="sizeValue">150px</span>
                 </div>
                 <div class="control-group">
@@ -1241,6 +1247,9 @@ def create_web_interface(groups, folder_path, port=5000):
             let scrollIntervals = {};         // Tracks active scroll intervals per group
             let scrollSpeed = 11;             // Pixels per interval (adjusted by speed slider)
             let verticalScrollDuration = 800; // Duration for viewport scroll animations
+            let masterPlayActive = false;     // Whether master auto-scroll is running
+            let masterPlayPaused = false;     // Whether master auto-scroll is paused
+            let currentMasterRow = 0;         // Current row being scrolled by master play
             
             // ===== Image size control =====
             document.getElementById('sizeSlider').addEventListener('input', function() {
@@ -1287,7 +1296,13 @@ def create_web_interface(groups, folder_path, port=5000):
                     } else {
                         // Start scrolling
                         if (!canScroll(groupIndex)) {
-                            // No scrollable content - do nothing
+                            // No scrollable content - wait based on scroll speed then notify completion
+                            const waitTime = 2000 - ((scrollSpeed - 2) / 18) * 1500; // 2000ms at slowest, 500ms at fastest
+                            setTimeout(() => {
+                                if (masterPlayActive && !masterPlayPaused && currentMasterRow === groupIndex) {
+                                    onMasterRowComplete(groupIndex);
+                                }
+                            }, waitTime);
                             return;
                         }
                         
@@ -1302,6 +1317,11 @@ def create_web_interface(groups, folder_path, port=5000):
                                 playBtn.textContent = '▶';
                                 playBtn.title = 'Auto-scroll';
                                 rewindBtn.disabled = false;
+                                
+                                // Notify master play that this row completed
+                                if (masterPlayActive && !masterPlayPaused && currentMasterRow === groupIndex) {
+                                    onMasterRowComplete(groupIndex);
+                                }
                             }
                         }, 20);  // Update every 20ms
                         playBtn.textContent = '⏸';
@@ -1315,16 +1335,186 @@ def create_web_interface(groups, folder_path, port=5000):
                 }
             }
             
-            // ===== Master play toggle (currently disabled - placeholder for future functionality) =====
-            function toggleMasterPlay() {
-                // Placeholder for master play functionality
-                console.log('Master play functionality disabled');
+            // ===== Highlight active master play row =====
+            function setActiveMasterRow(groupIndex) {
+                // Remove highlight from all rows
+                document.querySelectorAll('.group').forEach(group => {
+                    group.classList.remove('master-active');
+                });
+                
+                // Add highlight to current row
+                if (groupIndex !== null && groupIndex !== undefined) {
+                    const activeGroup = document.querySelector(`[data-group-index="${groupIndex}"]`);
+                    if (activeGroup) {
+                        activeGroup.classList.add('master-active');
+                    }
+                }
             }
             
-            // ===== Master play: reset (currently disabled - placeholder for future functionality) =====
+            // ===== Master play row completion callback =====
+            function onMasterRowComplete(groupIndex) {
+                if (!masterPlayActive || masterPlayPaused) return;
+                
+                // Move to next row
+                const totalGroups = document.querySelectorAll('.group').length;
+                const nextRow = groupIndex + 1;
+                
+                if (nextRow >= totalGroups) {
+                    // Finished all rows - stop master play
+                    stopMasterPlay();
+                    return;
+                }
+                
+                // Update current row
+                currentMasterRow = nextRow;
+                
+                // Highlight the next row
+                setActiveMasterRow(nextRow);
+                
+                // Scroll viewport to next row with offset for fixed header
+                const groupElement = document.querySelector(`[data-group-index="${nextRow}"]`);
+                if (groupElement) {
+                    const headerOffset = 160; // Controls bar height (140px) + extra padding (20px)
+                    const elementPosition = groupElement.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                    
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                    
+                    // Wait for viewport scroll, then start scrolling the row
+                    setTimeout(() => {
+                        if (masterPlayActive && !masterPlayPaused) {
+                            const container = document.getElementById('group-' + nextRow);
+                            container.scrollLeft = 0; // Reset scroll position
+                            scrollGroup(nextRow, 'play');
+                        }
+                    }, verticalScrollDuration);
+                }
+            }
+            
+            // ===== Master play toggle =====
+            function toggleMasterPlay() {
+                if (!masterPlayActive) {
+                    // Not running - start from beginning
+                    startMasterPlay();
+                } else if (masterPlayPaused) {
+                    // Currently paused - resume
+                    resumeMasterPlay();
+                } else {
+                    // Currently running - pause
+                    pauseMasterPlay();
+                }
+            }
+            
+            // ===== Master play: start =====
+            function startMasterPlay() {
+                masterPlayActive = true;
+                masterPlayPaused = false;
+                currentMasterRow = 0;
+                
+                const masterBtn = document.getElementById('masterPlayBtn');
+                masterBtn.textContent = '⏸';
+                masterBtn.classList.remove('paused');
+                masterBtn.title = 'Pause auto-scroll';
+                
+                // Highlight first row
+                setActiveMasterRow(0);
+                
+                // Scroll to top
+                window.scrollTo({ 
+                    top: 0,
+                    behavior: 'smooth' 
+                });
+                
+                // Wait for viewport scroll to complete, then start first row
+                setTimeout(() => {
+                    if (masterPlayActive && !masterPlayPaused) {
+                        const container = document.getElementById('group-0');
+                        container.scrollLeft = 0; // Reset scroll position
+                        scrollGroup(0, 'play');
+                    }
+                }, 1000);
+            }
+            
+            // ===== Master play: pause =====
+            function pauseMasterPlay() {
+                masterPlayPaused = true;
+                
+                const masterBtn = document.getElementById('masterPlayBtn');
+                masterBtn.textContent = '▶';
+                masterBtn.classList.add('paused');
+                masterBtn.title = 'Resume auto-scroll';
+                
+                // Pause the current row's scrolling
+                if (scrollIntervals[currentMasterRow]) {
+                    clearInterval(scrollIntervals[currentMasterRow]);
+                    scrollIntervals[currentMasterRow] = null;
+                    const playBtn = document.querySelectorAll('.play-btn')[currentMasterRow];
+                    playBtn.textContent = '▶';
+                    playBtn.title = 'Auto-scroll';
+                }
+            }
+            
+            // ===== Master play: resume =====
+            function resumeMasterPlay() {
+                masterPlayPaused = false;
+                
+                const masterBtn = document.getElementById('masterPlayBtn');
+                masterBtn.textContent = '⏸';
+                masterBtn.classList.remove('paused');
+                masterBtn.title = 'Pause auto-scroll';
+                
+                // Resume scrolling the current row from where it left off
+                scrollGroup(currentMasterRow, 'play');
+            }
+            
+            // ===== Master play: stop =====
+            function stopMasterPlay() {
+                masterPlayActive = false;
+                masterPlayPaused = false;
+                currentMasterRow = 0;
+                
+                const masterBtn = document.getElementById('masterPlayBtn');
+                masterBtn.textContent = '▶';
+                masterBtn.classList.remove('paused');
+                masterBtn.title = 'Auto-scroll all groups';
+                
+                // Remove highlight from all rows
+                setActiveMasterRow(null);
+                
+                // Stop any active scrolling
+                Object.keys(scrollIntervals).forEach(groupIndex => {
+                    if (scrollIntervals[groupIndex]) {
+                        clearInterval(scrollIntervals[groupIndex]);
+                        scrollIntervals[groupIndex] = null;
+                        const playBtn = document.querySelectorAll('.play-btn')[groupIndex];
+                        playBtn.textContent = '▶';
+                        playBtn.title = 'Auto-scroll';
+                    }
+                });
+            }
+            
+            // ===== Master play: reset =====
             function resetMasterPlay() {
-                // Placeholder for reset functionality
-                console.log('Reset functionality disabled');
+                // Stop master play completely
+                stopMasterPlay();
+                
+                // Scroll to top
+                window.scrollTo({ 
+                    top: 0,
+                    behavior: 'smooth' 
+                });
+                
+                // Reset all row scroll positions
+                document.querySelectorAll('.image-container').forEach((container, index) => {
+                    container.scrollLeft = 0;
+                    const rewindBtn = document.querySelectorAll('.rewind-btn')[index];
+                    if (rewindBtn) {
+                        rewindBtn.disabled = true;
+                    }
+                });
             }
             
             // ===== Enable rewind button when scrolled =====
