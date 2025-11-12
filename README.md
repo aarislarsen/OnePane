@@ -1,6 +1,6 @@
 DISCLAIMER: This was 100% vibe-coded using Claude. That means I know exactly what techniques and design decisions were made, but I barely understand any of the code. That also means if something doesn't work, your best bet is to just throw all of it into an LLM and ask it to fix it. It also means you probably shouldn't use this for anything important or expose it to anyone. You have been warned.
 
-OnePane is a simple utility that solves a recurring problem; you've run go-witness or aquatone or whatever your favorite screen-grabing tool might be, but now you have to many screenshots to look through manually, and you JUST KNOW that a ton of them are gonna be identical. *SIGH*!
+OnePane is a simple utility that solves a recurring problem; you've run go-witness or aquatone or whatever your favorite screen-grabing tool might be, but now you have too many screenshots to look through manually, and you JUST KNOW that a ton of them are gonna be identical. *SIGH*!
 
 Fear not, OnePane got your back.
 
