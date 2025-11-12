@@ -792,7 +792,7 @@ def create_web_interface(groups, folder_path, port=5000):
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Screenshot Similarity Groups</title>
+        <title>OnePane - Screenshot comaprison utility and viewer</title>
         <style>
             * {
                 box-sizing: border-box;
@@ -1170,7 +1170,7 @@ def create_web_interface(groups, folder_path, port=5000):
         
         <!-- Top control bar -->
         <div class="controls-bar">
-            <h1>Screenshot Similarity Groups</h1>
+            <h1>OnePane - Screenshot comaprison utility and viewer</h1>
             <div class="controls-grid">
                 <div class="control-group">
                     <label>Image Size:</label>
