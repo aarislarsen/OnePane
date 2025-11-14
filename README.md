@@ -1,4 +1,8 @@
-DISCLAIMER: This was 100% vibe-coded using Claude. That means I know exactly what techniques and design decisions were made, but I barely understand any of the code. That also means if something doesn't work, your best bet is to just throw all of it into an LLM and ask it to fix it. It also means you probably shouldn't use this for anything important or expose it to anyone. You have been warned.
+## DISCLAIMER
+
+This was 100% vibe-coded using Claude. That means I know exactly what techniques and design decisions were made, but I barely understand any of the code. That also means if something doesn't work, your best bet is to just throw all of it into an LLM and ask it to fix it. It also means you probably shouldn't use this for anything important or expose it to anyone. You have been warned.
+
+## Description
 
 OnePane is a simple utility that solves a recurring problem; you've run go-witness or aquatone or whatever your favorite screen-grabing tool might be, but now you have too many screenshots to look through manually, and you JUST KNOW that a ton of them are gonna be identical. *SIGH*!
 
@@ -19,7 +23,8 @@ Results are heavily cached for performance across multiple runs, so unless you c
 
 Speaking of run:
 
-```
+## Getting started
+```bash
 Usage: python3 script.py <folder_path> [exact_threshold] [structural_threshold] [port]
   folder_path: Directory containing screenshots
   exact_threshold: Exact duplicate threshold (default: 97)
@@ -27,9 +32,9 @@ Usage: python3 script.py <folder_path> [exact_threshold] [structural_threshold] 
   port: Web server port (default: 5000)
 ```
 
-Example
+### Example
 
-```cmd
+```bash
 python3 OnePane.py /path/to/folder/with/screenshots/
 ```
 
@@ -37,3 +42,18 @@ This will run a Flask web application on your localhost port 5000, using the def
 
 <img width="1685" height="585" alt="image" src="https://github.com/user-attachments/assets/0ab00ee6-39f4-45c8-8fe2-d34656e6bde9" />
 
+### Suggested workflow
+
+Run your favourite portscanner. For big networks where you can afford to miss a system or two in return for getting wide coverage, something like https://github.com/robertdavidgraham/masscan works really well, and can be run like so:
+```bash
+masscan -p80,8000-8100 10.0.0.0/8 --max-rate 10000 -oG outputfile
+```
+Just make sure to include all the ports where you expect there would be web interfaces on (and that you know how to attack), then run your favourite screen-grabbing tool, like https://github.com/michenriksen/aquatone (which inspired this tool), or https://github.com/sensepost/gowitness:
+```bash
+gowitness scan -nmap -f outputfile --threads 50 --open-only --write-jsonl outputfile --write-screenshots
+```
+Let it run, and now point OnePane at the screenshots folder:
+```bash
+python3 OnePane.py screenshots/ 97 97 5000
+```
+Browse to http://localhost:5000, sit back and enjoy the show!
