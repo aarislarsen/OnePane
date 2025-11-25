@@ -31,6 +31,7 @@ Usage: python3 script.py <folder_path> [exact_threshold] [structural_threshold] 
   structural_threshold: Structural similarity threshold (default: 97)
   port: Web server port (default: 5000)
 ```
+You must have Python3 and pip installed, everything else should be handled automatically.
 
 ### Example
 
